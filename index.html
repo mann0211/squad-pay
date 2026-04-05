@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>中部小隊同步神器 5.1</title>
+    <title>中部小隊同步神器 6.0</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; padding: 15px; background-color: #eef2f3; color: #333; }
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 15px; background-color: #f0f4f8; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #4a90e2; margin-bottom: 5px; }
         .status-tag { font-size: 10px; text-align: center; color: #28a745; margin-bottom: 15px; font-weight: bold; }
@@ -18,26 +17,27 @@
         input, select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
         .btn-main-group { display: flex; gap: 10px; margin-top: 10px; }
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 8px; transition: 0.2s; }
-        button:active { opacity: 0.7; transform: scale(0.98); }
         .add-btn { flex: 1; background-color: #4a90e2; color: white; padding: 12px; }
         .split-btn { flex: 1; background-color: #34c759; color: white; padding: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border-bottom: 1px solid #f0f0f0; padding: 12px 5px; text-align: left; }
-        .del-btn { background: #ff5e5e; color: white; padding: 6px 10px; border-radius: 6px; }
-        .summary { margin-top: 25px; padding: 15px; background: #f8f9ff; border-radius: 12px; border: 1px dashed #4a90e2; }
-        .result-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+        th, td { border-bottom: 1px solid #f0f0f0; padding: 10px 5px; text-align: left; }
+        .del-btn { background: #ff5e5e; color: white; padding: 4px 8px; border-radius: 4px; }
+        .summary { margin-top: 20px; padding: 15px; background: #f8f9ff; border-radius: 12px; border: 1px dashed #4a90e2; }
+        .settlement { margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 12px; border: 1px solid #ffeeba; }
+        .settlement h4 { margin: 0 0 10px 0; color: #856404; }
+        .result-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; font-size: 14px; }
         .plus { color: #28a745; font-weight: bold; }
         .minus { color: #dc3545; font-weight: bold; }
         .footer-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-        .copy-btn { background: #007aff; color: white; padding: 14px; font-size: 16px; }
-        .clear-all-btn { background: #dc3545; color: white; padding: 14px; font-size: 16px; }
+        .copy-btn { background: #007aff; color: white; padding: 14px; }
+        .clear-all-btn { background: #dc3545; color: white; padding: 14px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="status-tag">● 雲端即時同步中</div>
-    <h2>🏔️ 中部小隊同步神器</h2>
+    <h2>🏔️ 中部小隊同步神器 6.0</h2>
     
     <div class="input-group">
         <input type="text" id="itemName" placeholder="物品名稱">
@@ -64,10 +64,18 @@
         <tbody id="itemBody"></tbody>
     </table>
 
-    <div class="summary">
-        <h3>💰 最終結算：</h3>
-        <div id="summaryContent">正在連線至雲端...</div>
-        <div class="footer-btns" id="footerButtons" style="display:none;">
+    <div id="summaryArea" style="display:none;">
+        <div class="summary">
+            <h3>💰 結算概覽：</h3>
+            <div id="summaryContent"></div>
+        </div>
+
+        <div class="settlement">
+            <h4>🤝 轉帳指引 (邊個俾邊個)：</h4>
+            <div id="settlementContent"></div>
+        </div>
+
+        <div class="footer-btns">
             <button class="copy-btn" onclick="copyToClipboard()">📋 複製報數文字</button>
             <button class="clear-all-btn" onclick="clearAll()">✅ 找清並清空雲端紀錄</button>
         </div>
@@ -75,23 +83,21 @@
 </div>
 
 <script>
-    // 已填入你提供嘅 Firebase 配置
+    // 使用你之前提供的 Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDMKX2EGLa4sBZQpkDuzgb5atKH_GMKpBc",
         authDomain: "squad-pay-35a30.firebaseapp.com",
         projectId: "squad-pay-35a30",
-        databaseURL: "https://squad-pay-35a30-default-rtdb.firebaseio.com", // 自動補完
+        databaseURL: "https://squad-pay-35a30-default-rtdb.firebaseio.com",
         storageBucket: "squad-pay-35a30.firebasestorage.app",
         messagingSenderId: "720885129104",
         appId: "1:720885129104:web:15f5916920999a85bb9d15"
     };
 
-    // 初始化
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('squad_data');
     const names = ["Emmy", "Tracy", "Crystal"];
 
-    // 監聽數據
     db.on('value', (snapshot) => {
         const data = snapshot.val();
         const items = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
@@ -115,22 +121,12 @@
             payer: payer,
             receiver: receiver
         });
-        
-        nameEl.value = '';
-        priceEl.value = '';
-        qtyEl.value = 1;
+        nameEl.value = ''; priceEl.value = ''; qtyEl.value = 1;
     }
 
-    function deleteItem(id) {
-        if(confirm("確定刪除呢項？")) db.child(id).remove();
-    }
+    function deleteItem(id) { if(confirm("確定刪除？")) db.child(id).remove(); }
 
-    function clearAll() {
-        if(confirm("找清晒數喇？清空後三個人部機都會變返白紙喎！")) {
-            db.remove();
-            alert("雲端紀錄已清空 🍻");
-        }
-    }
+    function clearAll() { if(confirm("確定清空？")) db.remove(); }
 
     function render(items) {
         const body = document.getElementById('itemBody');
@@ -147,35 +143,43 @@
                 balances[item.payer] += totalAmount;
                 balances[item.receiver] -= totalAmount;
             }
-            body.innerHTML += `<tr>
-                <td>${item.name}</td>
-                <td>$${totalAmount.toFixed(2)}</td>
-                <td style="font-size:10px;">${item.payer}➔${item.receiver==='Everyone'?'大家':item.receiver}</td>
-                <td><button class="del-btn" onclick="deleteItem('${item.id}')">✕</button></td>
-            </tr>`;
+            body.innerHTML += `<tr><td>${item.name}</td><td>$${totalAmount.toFixed(2)}</td><td>${item.payer}➔${item.receiver==='Everyone'?'大家':item.receiver}</td><td><button class="del-btn" onclick="deleteItem('${item.id}')">✕</button></td></tr>`;
         });
 
-        const footerBtns = document.getElementById('footerButtons');
-        const summaryContent = document.getElementById('summaryContent');
+        const summaryArea = document.getElementById('summaryArea');
+        if (items.length === 0) { summaryArea.style.display = 'none'; return; }
+        summaryArea.style.display = 'block';
 
-        if (items.length === 0) {
-            summaryContent.innerHTML = '目前冇數要找，大家加油買嘢！🛍️';
-            footerBtns.style.display = 'none';
-            return;
-        }
-
-        footerBtns.style.display = 'flex';
-        let html = '';
+        // 1. 顯示總結
+        let summaryHtml = '';
         names.forEach(n => {
             const b = balances[n];
-            html += `<div class="result-row"><span>${n}</span><span class="${b>=0?'plus':'minus'}">${b>=0?'收返':'俾返'} $${Math.abs(b).toFixed(2)}</span></div>`;
+            summaryHtml += `<div class="result-row"><span>${n}</span><span class="${b>=0?'plus':'minus'}">${b>=0?'收返':'俾返'} $${Math.abs(b).toFixed(2)}</span></div>`;
         });
-        summaryContent.innerHTML = html;
+        document.getElementById('summaryContent').innerHTML = summaryHtml;
+
+        // 2. 債務計算 (邊個俾邊個)
+        let debtors = [], creditors = [];
+        names.forEach(n => {
+            if (balances[n] < -0.01) debtors.push({name: n, amt: Math.abs(balances[n])});
+            else if (balances[n] > 0.01) creditors.push({name: n, amt: balances[n]});
+        });
+
+        let settlementHtml = '';
+        debtors.forEach(d => {
+            creditors.forEach(c => {
+                if (d.amt > 0 && c.amt > 0) {
+                    let pay = Math.min(d.amt, c.amt);
+                    settlementHtml += `<div class="result-row"><span><b>${d.name}</b> ➔ <b>${c.name}</b></span><span>$${pay.toFixed(2)}</span></div>`;
+                    d.amt -= pay; c.amt -= pay;
+                }
+            });
+        });
+        document.getElementById('settlementContent').innerHTML = settlementHtml || "唔使找數，大家平晒！🍻";
     }
 
     function copyToClipboard() {
-        const summary = document.getElementById('summaryContent').innerText;
-        let text = "🏔️【中部小隊 雲端找數報數】\n\n" + summary + "\n\n找咗數記住撳清空呀！🙏";
+        let text = "🏔️【中部小隊 6.0 找數指令】\n\n💰 結算：\n" + document.getElementById('summaryContent').innerText + "\n\n🤝 轉帳指引：\n" + document.getElementById('settlementContent').innerText + "\n\n找完請清空紀錄！🙏";
         navigator.clipboard.writeText(text).then(() => alert("已複製報數文字！"));
     }
 </script>
