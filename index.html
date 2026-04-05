@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>中部小隊同步神器 6.0</title>
+    <title>中部小隊同步神器 7.0</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; padding: 15px; background-color: #f0f4f8; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #4a90e2; margin-bottom: 5px; }
-        .status-tag { font-size: 10px; text-align: center; color: #28a745; margin-bottom: 15px; font-weight: bold; }
+        .status-bar { display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-bottom: 15px; padding: 0 5px; }
+        .last-clear { color: #e67e22; font-weight: bold; }
         .input-group { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
         .row { display: flex; gap: 8px; align-items: center; }
         .label { font-size: 14px; font-weight: bold; min-width: 70px; color: #666; }
@@ -36,8 +37,11 @@
 <body>
 
 <div class="container">
-    <div class="status-tag">● 雲端即時同步中</div>
-    <h2>🏔️ 中部小隊同步神器 6.0</h2>
+    <div class="status-bar">
+        <span>● 雲端同步中</span>
+        <span id="lastClearText" class="last-clear">最後找清：未有紀錄</span>
+    </div>
+    <h2>🏔️ 中部小隊同步神器 7.0</h2>
     
     <div class="input-group">
         <input type="text" id="itemName" placeholder="物品名稱">
@@ -69,12 +73,10 @@
             <h3>💰 結算概覽：</h3>
             <div id="summaryContent"></div>
         </div>
-
         <div class="settlement">
             <h4>🤝 轉帳指引 (邊個俾邊個)：</h4>
             <div id="settlementContent"></div>
         </div>
-
         <div class="footer-btns">
             <button class="copy-btn" onclick="copyToClipboard()">📋 複製報數文字</button>
             <button class="clear-all-btn" onclick="clearAll()">✅ 找清並清空雲端紀錄</button>
@@ -83,7 +85,6 @@
 </div>
 
 <script>
-    // 使用你之前提供的 Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDMKX2EGLa4sBZQpkDuzgb5atKH_GMKpBc",
         authDomain: "squad-pay-35a30.firebaseapp.com",
@@ -95,10 +96,19 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database().ref('squad_data');
+    const dbItems = firebase.database().ref('squad_data/items');
+    const dbMeta = firebase.database().ref('squad_data/meta');
     const names = ["Emmy", "Tracy", "Crystal"];
 
-    db.on('value', (snapshot) => {
+    // 監聽清空日期
+    dbMeta.child('lastClear').on('value', (snapshot) => {
+        if (snapshot.val()) {
+            document.getElementById('lastClearText').innerText = "最後找清：" + snapshot.val();
+        }
+    });
+
+    // 監聽清單數據
+    dbItems.on('value', (snapshot) => {
         const data = snapshot.val();
         const items = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
         render(items);
@@ -114,7 +124,7 @@
         const price = parseFloat(priceEl.value);
         if (isNaN(price)) return alert("入返價錢先！");
 
-        db.push({
+        dbItems.push({
             name: nameEl.value || "未命名",
             price: price,
             qty: parseInt(qtyEl.value),
@@ -124,9 +134,17 @@
         nameEl.value = ''; priceEl.value = ''; qtyEl.value = 1;
     }
 
-    function deleteItem(id) { if(confirm("確定刪除？")) db.child(id).remove(); }
+    function deleteItem(id) { if(confirm("確定刪除？")) dbItems.child(id).remove(); }
 
-    function clearAll() { if(confirm("確定清空？")) db.remove(); }
+    function clearAll() {
+        if(confirm("確定找清並清空？")) {
+            const now = new Date();
+            const timeStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            dbItems.remove(); // 清空項目
+            dbMeta.update({ lastClear: timeStr }); // 更新日期
+        }
+    }
 
     function render(items) {
         const body = document.getElementById('itemBody');
@@ -150,7 +168,6 @@
         if (items.length === 0) { summaryArea.style.display = 'none'; return; }
         summaryArea.style.display = 'block';
 
-        // 1. 顯示總結
         let summaryHtml = '';
         names.forEach(n => {
             const b = balances[n];
@@ -158,7 +175,6 @@
         });
         document.getElementById('summaryContent').innerHTML = summaryHtml;
 
-        // 2. 債務計算 (邊個俾邊個)
         let debtors = [], creditors = [];
         names.forEach(n => {
             if (balances[n] < -0.01) debtors.push({name: n, amt: Math.abs(balances[n])});
@@ -175,12 +191,12 @@
                 }
             });
         });
-        document.getElementById('settlementContent').innerHTML = settlementHtml || "唔使找數，大家平晒！🍻";
+        document.getElementById('settlementContent').innerHTML = settlementHtml || "金額已抵消！🍻";
     }
 
     function copyToClipboard() {
-        let text = "🏔️【中部小隊 6.0 找數指令】\n\n💰 結算：\n" + document.getElementById('summaryContent').innerText + "\n\n🤝 轉帳指引：\n" + document.getElementById('settlementContent').innerText + "\n\n找完請清空紀錄！🙏";
-        navigator.clipboard.writeText(text).then(() => alert("已複製報數文字！"));
+        let text = "🏔️【中部小隊 找數指令】\n\n💰 結算概覽：\n" + document.getElementById('summaryContent').innerText + "\n\n🤝 轉帳指引：\n" + document.getElementById('settlementContent').innerText + "\n\n找完請清空紀錄！🙏";
+        navigator.clipboard.writeText(text).then(() => alert("已複製！"));
     }
 </script>
 </body>
